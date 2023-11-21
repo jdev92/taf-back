@@ -65,7 +65,7 @@ router.get("/allEvents", async (req, res) => {
 });
 
 // Supprimer un Event
-router.delete("/deleteEvent/:id", async (req, res) => {
+router.delete("/deleteEvent/:eventId", async (req, res) => {
   try {
     const { eventId } = req.params;
     const deletedEvent = await Event.deleteOne(eventId);
