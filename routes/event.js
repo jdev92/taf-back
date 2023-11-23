@@ -68,13 +68,14 @@ router.get("/allEvents", async (req, res) => {
 router.delete("/deleteEvent/:eventId", async (req, res) => {
   try {
     const { eventId } = req.params;
-    const deletedEvent = await Event.deleteOne(eventId);
+    const deletedEvent = await Event.deleteOne({ _id: eventId });
     if (!deletedEvent) {
       return res.status(404).json({ message: "Événement non trouvé" });
     }
 
     res.json({ message: "Événement supprimé avec succès" });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 });
