@@ -5,16 +5,24 @@ const Event = require("../models/Event");
 // Créer un Event
 router.post("/create-event", async (req, res) => {
   try {
-    const { title, start, end, userId } = req.body;
+    const { title, start, end, userId, daysOfWeek, periode } = req.body;
+
+    const periodeData = Array.isArray(periode) ? periode : [periode];
 
     const event = new Event({
       title,
       start,
       end,
       user: userId,
+      daysOfWeek: periodeData,
     });
-    await event.save();
-    res.sendStatus(201);
+
+    const savedEvent = await event.save();
+
+    res.status(201).json({
+      eventId: savedEvent._id,
+    });
+    console.log(event);
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: error.message });
