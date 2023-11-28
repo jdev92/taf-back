@@ -16,6 +16,11 @@ const userSchema = new mongoose.Schema({
     },
   },
   avatar: Object,
+  // createdAt: {
+  //   type: Date,
+  //   default: Date.now,
+  //   set: (date) => date.setHours(0, 0, 0, 0),
+  // },
 });
 
 const User = mongoose.model("User", userSchema);

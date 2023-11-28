@@ -15,6 +15,7 @@ router.post("/createUser", async (req, res) => {
           lastName: lastName,
           firstName: firstName,
           email: email,
+          createdAt: new Date().setHours(0, 0, 0, 0),
         });
 
         await newUser.save();

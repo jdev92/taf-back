@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Event = require("../models/Event");
+const moment = require("moment");
 
 // Créer un Event avec jours de la semaine sélectionnés
 router.post("/create-event", async (req, res) => {
@@ -15,12 +16,15 @@ router.post("/create-event", async (req, res) => {
 
     const event = new Event({
       title,
-      start,
-      end,
+      start: new Date(start),
+      end: new Date(end),
       user: userId,
       daysOfWeek,
       Events: eventsData,
-      periode: periodeData,
+      periode: periodeData.map((p) => ({
+        date: new Date(p.date),
+        dayOfWeek: p.dayOfWeek,
+      })),
     });
 
     const savedEvent = await event.save();
@@ -44,33 +48,12 @@ router.get("/userEvents/:id", async (req, res) => {
     const formattedUserEvents = userEvents.map((event) => ({
       _id: event._id,
       title: event.title,
-      start: event.start.toLocaleDateString(),
-      end: event.end.toLocaleDateString(),
+      start: moment(event.start).format("YYYY-MM-DD"), // Format YYYY-MM-DD
+      end: moment(event.end).format("YYYY-MM-DD"), // Format YYYY-MM-DD
       periode: event.periode.map((day) => ({
-        date: day.date.toLocaleDateString(),
+        date: moment(day.date).format("YYYY-MM-DD"), // Format YYYY-MM-DD
         dayOfWeek: day.dayOfWeek,
       })),
-    }));
-
-    res.json(formattedUserEvents);
-  } catch (error) {
-    console.log(error.message);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Récupérer tous les évènements de l'utilisateur
-router.get("/userEvents/:id", async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const userEvents = await Event.find({ user: userId });
-
-    // Formater les dates pour afficher uniquement la date sans l'heure
-    const formattedUserEvents = userEvents.map((event) => ({
-      _id: event._id,
-      title: event.title,
-      start: event.start.toLocaleDateString(),
-      end: event.end.toLocaleDateString(),
     }));
 
     res.json(formattedUserEvents);
@@ -87,8 +70,8 @@ router.get("/allEvents", async (req, res) => {
     const formattedUserEvents = allEvents.map((event) => ({
       _id: event._id,
       title: event.title,
-      start: event.start.toLocaleDateString(),
-      end: event.end.toLocaleDateString(),
+      start: event.start.toISOString(),
+      end: event.end.toISOString(),
       user: {
         _id: event.user._id,
         firstName: event.user.firstName,
