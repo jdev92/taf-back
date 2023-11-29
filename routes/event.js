@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const Event = require("../models/Event");
+const User = require("../models/User");
 const moment = require("moment");
 
-// Créer un Event avec jours de la semaine sélectionnés
+// Créer un Event avec les jours de la semaine sélectionnés
 router.post("/create-event", async (req, res) => {
   try {
     const { title, start, end, userId, daysOfWeek, periode } = req.body;
@@ -43,15 +44,13 @@ router.get("/userEvents/:id", async (req, res) => {
   try {
     const userId = req.params.id;
     const userEvents = await Event.find({ user: userId });
-
-    // Formater les dates pour afficher uniquement la date sans l'heure
     const formattedUserEvents = userEvents.map((event) => ({
       _id: event._id,
       title: event.title,
-      start: moment(event.start).format("YYYY-MM-DD"), // Format YYYY-MM-DD
-      end: moment(event.end).format("YYYY-MM-DD"), // Format YYYY-MM-DD
+      start: moment(event.start).format("DD/MM/YYYY"),
+      end: moment(event.end).format("DD/MM/YYYY"),
       periode: event.periode.map((day) => ({
-        date: moment(day.date).format("YYYY-MM-DD"), // Format YYYY-MM-DD
+        date: moment(day.date).format("DD/MM/YYYY"),
         dayOfWeek: day.dayOfWeek,
       })),
     }));
@@ -63,6 +62,53 @@ router.get("/userEvents/:id", async (req, res) => {
   }
 });
 
+// // Récupérer les utilisateurs présents pour un jour spécifique
+router.get("/presentUsers/:date", async (req, res) => {
+  try {
+    const { date } = req.params;
+    const selectedDate = moment(date, "DD/MM/YYYY").toDate();
+
+    // Calculer la date de fin en ajoutant 24 heures à la date de début
+    const selectedEndDate = new Date(
+      selectedDate.getTime() + 24 * 60 * 60 * 1000
+    );
+
+    // Récupérer les événements pour le jour spécifique
+    const events = await Event.find({
+      $and: [
+        { "periode.date": { $gte: selectedDate } },
+        { "periode.date": { $lte: selectedEndDate } },
+      ],
+    });
+
+    if (events.length === 0) {
+      return res.json({
+        message: "Aucun événement trouvé pour cette date.",
+      });
+    }
+
+    const formattedEvents = events.map((event) => ({
+      ...event.toObject(),
+      periode: event.periode.map((day) => ({
+        date: moment(day.date).format("DD/MM/YYYY"),
+        dayOfWeek: day.dayOfWeek,
+      })),
+    }));
+
+    // Récupérer les utilisateurs associés aux événements
+    const userIds = formattedEvents.map((event) => event.user);
+    const presentUsers = await User.find({ _id: { $in: userIds } });
+
+    res.json({
+      events: formattedEvents,
+      presentUsers: presentUsers,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
 // Récupérer tous les évènements
 router.get("/allEvents", async (req, res) => {
   try {
@@ -70,8 +116,8 @@ router.get("/allEvents", async (req, res) => {
     const formattedUserEvents = allEvents.map((event) => ({
       _id: event._id,
       title: event.title,
-      start: event.start.toISOString(),
-      end: event.end.toISOString(),
+      start: moment(event.start).format("DD/MM/YYYY"),
+      end: moment(event.end).format("DD/MM/YYYY"),
       user: {
         _id: event.user._id,
         firstName: event.user.firstName,
