@@ -9,7 +9,7 @@ const EventSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   periode: [
     {
-      date: { type: Date, default: null }, // Définir le type Date pour la propriété date
+      date: { type: Date, default: null },
       dayOfWeek: String,
     },
   ],
