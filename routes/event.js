@@ -118,6 +118,10 @@ router.get("/allEvents", async (req, res) => {
       title: event.title,
       start: moment(event.start).format("DD/MM/YYYY"),
       end: moment(event.end).format("DD/MM/YYYY"),
+      presentDays: event.daysOfWeek,
+      periode: event.periode.map((day) => ({
+        date: moment(day.date).format("DD/MM/YYYY"),
+      })),
       user: {
         _id: event.user._id,
         firstName: event.user.firstName,
