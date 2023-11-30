@@ -12,15 +12,16 @@ const userSchema = new mongoose.Schema({
     unique: true,
     type: String,
     validate(v) {
-      if (!validator.isEmail(v)) throw new Error("Email non valide !");
+      if (!validator.isEmail(v)) {
+        throw new Error("Email non valide !");
+      }
     },
   },
   avatar: Object,
-  // createdAt: {
-  //   type: Date,
-  //   default: Date.now,
-  //   set: (date) => date.setHours(0, 0, 0, 0),
-  // },
+  createdAt: {
+    type: Date,
+    default: () => new Date(),
+  },
 });
 
 const User = mongoose.model("User", userSchema);
