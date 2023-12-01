@@ -7,7 +7,7 @@ const moment = require("moment");
 // Créer un Event
 router.post("/create-event", async (req, res) => {
   try {
-    const { title, start, end, userId, daysOfWeek, periode } = req.body;
+    const { title, start, end, userId, daysOfWeek } = req.body;
     const joursSelectionnes =
       daysOfWeek.length > 0
         ? daysOfWeek
@@ -112,7 +112,8 @@ router.get("/userEvents/:id", async (req, res) => {
 router.get("/presentUsers/:date", async (req, res) => {
   try {
     const { date } = req.params;
-    const selectedDate = moment(date, "DD/MM/YYYY").toDate();
+    // const selectedDate = moment(date, "DD/MM/YYYY").toDate();
+    const selectedDate = moment.utc(date, "D/M/YYYY").toDate();
 
     // Calculer la date de fin en ajoutant 24 heures à la date de début
     const selectedEndDate = new Date(
@@ -121,15 +122,13 @@ router.get("/presentUsers/:date", async (req, res) => {
 
     // Récupérer les événements pour le jour spécifique
     const events = await Event.find({
-      $and: [
-        { "periode.date": { $gte: selectedDate } },
-        { "periode.date": { $lte: selectedEndDate } },
-      ],
+      "periode.date": selectedDate,
     });
+    console.log(selectedDate);
 
     if (events.length === 0) {
       return res.json({
-        message: "Aucun événement trouvé pour cette date.",
+        message: "Aucun utilisateur trouvé pour cette date.",
       });
     }
 
@@ -146,7 +145,6 @@ router.get("/presentUsers/:date", async (req, res) => {
     const presentUsers = await User.find({ _id: { $in: userIds } });
 
     res.json({
-      events: formattedEvents,
       presentUsers: presentUsers,
     });
   } catch (error) {
@@ -160,7 +158,13 @@ router.get("/allEvents", async (req, res) => {
   try {
     const allEvents = await Event.find().populate("user");
     const formattedUserEvents = allEvents.map((event) => ({
-      _id: event._id,
+      user: {
+        _id: event.user._id,
+        firstName: event.user.firstName,
+        lastName: event.user.lastName,
+        email: event.user.email,
+      },
+      event_id: event._id,
       title: event.title,
       start: moment(event.start).format("DD/MM/YYYY"),
       end: moment(event.end).format("DD/MM/YYYY"),
@@ -168,12 +172,6 @@ router.get("/allEvents", async (req, res) => {
       periode: event.periode.map((day) => ({
         date: moment(day.date).format("DD/MM/YYYY"),
       })),
-      user: {
-        _id: event.user._id,
-        firstName: event.user.firstName,
-        lastName: event.user.lastName,
-        email: event.user.email,
-      },
     }));
     res.json(formattedUserEvents);
   } catch (error) {
