@@ -4,40 +4,86 @@ const Event = require("../models/Event");
 const User = require("../models/User");
 const moment = require("moment");
 
-// Créer un Event avec les jours de la semaine sélectionnés
+// Créer un Event
 router.post("/create-event", async (req, res) => {
   try {
     const { title, start, end, userId, daysOfWeek, periode } = req.body;
+    const joursSelectionnes =
+      daysOfWeek.length > 0
+        ? daysOfWeek
+        : ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
+    const periodeSelectionnee = [];
 
-    const eventsData = Array.isArray(daysOfWeek)
-      ? daysOfWeek.map((day) => ({ Event: day }))
-      : [];
+    // Convertit la date de début et de fin en objets de date
+    const dateStart = new Date(start);
+    const dateEnd = new Date(end);
 
-    const periodeData = Array.isArray(periode) ? periode : [periode];
+    // Trouve le premier jour sélectionné
+    while (
+      !joursSelectionnes.includes(getDayOfWeek(dateStart)) &&
+      dateStart <= dateEnd
+    ) {
+      dateStart.setDate(dateStart.getDate() + 1);
+    }
+
+    // Trouve le dernier jour sélectionné
+    while (
+      !joursSelectionnes.includes(getDayOfWeek(dateEnd)) &&
+      dateEnd >= dateStart
+    ) {
+      dateEnd.setDate(dateEnd.getDate() - 1);
+    }
+
+    // Initialise la date courante à la date de début
+    let currentDate = new Date(dateStart);
+
+    // Liste des dates pour la période sélectionnée
+    while (currentDate <= dateEnd) {
+      if (joursSelectionnes.includes(getDayOfWeek(currentDate))) {
+        periodeSelectionnee.push({
+          date: new Date(currentDate.getTime()),
+          dayOfWeek: getDayOfWeek(currentDate),
+        });
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const periodeData = periodeSelectionnee.map((p) => ({
+      date: p.date,
+      dayOfWeek: p.dayOfWeek,
+    }));
 
     const event = new Event({
       title,
       start: new Date(start),
       end: new Date(end),
       user: userId,
-      daysOfWeek,
-      Events: eventsData,
-      periode: periodeData.map((p) => ({
-        date: new Date(p.date),
-        dayOfWeek: p.dayOfWeek,
-      })),
+      daysOfWeek: joursSelectionnes,
+      periode: periodeData,
     });
 
     const savedEvent = await event.save();
 
     res.status(201).json({
+      user: userId,
       eventId: savedEvent._id,
+      title,
+      start: new Date(start),
+      end: new Date(end),
+      daysOfWeek: joursSelectionnes,
+      periode: periodeData,
     });
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: error.message });
   }
 });
+
+// Obtenir le jour de la semaine sous forme de chaîne
+function getDayOfWeek(date) {
+  const daysOfWeek = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
+  return daysOfWeek[date.getDay() - 1];
+}
 
 // Récupérer tous les évènements de l'utilisateur
 router.get("/userEvents/:id", async (req, res) => {
