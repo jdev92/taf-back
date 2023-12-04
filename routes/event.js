@@ -108,7 +108,54 @@ router.get("/userEvents/:id", async (req, res) => {
   }
 });
 
-// // Récupérer les utilisateurs présents pour un jour spécifique
+// Récupérer les utilisateurs présents (home page)
+router.get("/presentUsers", async (req, res) => {
+  try {
+    const currentDate = new Date();
+    const selectedDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate()
+    );
+
+    // Calculer la date de fin en ajoutant 24 heures à la date de début
+    const selectedEndDate = new Date(
+      selectedDate.getTime() + 24 * 60 * 60 * 1000
+    );
+
+    // Récupérer les événements pour le jour spécifique
+    const events = await Event.find({
+      "periode.date": { $gte: selectedDate, $lt: selectedEndDate },
+    });
+
+    if (events.length === 0) {
+      return res.json({
+        message: "Aucun utilisateur trouvé pour cette date.",
+      });
+    }
+
+    const formattedEvents = events.map((event) => ({
+      ...event.toObject(),
+      periode: event.periode.map((day) => ({
+        date: moment(day.date).format("DD/MM/YYYY"),
+        dayOfWeek: day.dayOfWeek,
+      })),
+    }));
+
+    // Récupérer les utilisateurs associés aux événements
+    const userIds = formattedEvents.map((event) => event.user);
+    const presentUsers = await User.find({ _id: { $in: userIds } });
+
+    res.json({
+      presentUsers: presentUsers,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
+// Récupérer les utilisateurs présents pour un jour spécifique
 router.get("/presentUsers/:date", async (req, res) => {
   try {
     const { date } = req.params;
@@ -152,6 +199,40 @@ router.get("/presentUsers/:date", async (req, res) => {
     res.status(500).json({ message: "Erreur du serveur" });
   }
 });
+
+// router.get("/presentUsers/:date", async (req, res) => {
+//   try {
+//     const { date } = req.params;
+
+//     // Vérifier si la date est valide
+//     const selectedDate = new Date(date);
+//     if (isNaN(selectedDate.getTime())) {
+//       return res.status(400).json({ message: "Date invalide." });
+//     }
+
+//     // Récupérer les événements pour le jour spécifique
+//     const events = await Event.find({
+//       "periode.date": selectedDate,
+//     });
+
+//     if (events.length === 0) {
+//       return res.json({
+//         message: "Aucun événement trouvé pour cette date.",
+//       });
+//     }
+
+//     // Récupérer les utilisateurs associés aux événements
+//     const userIds = events.map((event) => event.user);
+//     const presentUsers = await User.find({ _id: { $in: userIds } });
+
+//     res.json({
+//       presentUsers: presentUsers,
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Erreur du serveur" });
+//   }
+// });
 
 // Récupérer tous les évènements
 router.get("/allEvents", async (req, res) => {
