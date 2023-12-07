@@ -8,13 +8,26 @@ const moment = require("moment");
 router.post("/create-event", async (req, res) => {
   try {
     const { title, start, end, userId, daysOfWeek } = req.body;
+    // Récupérer le statut de l'utilisateur
+    const user = await User.findById(userId);
+    const userStatus = user.status || "Cours";
+
+    // Liste des jours de la semaine non sélectionnés
+    const joursNonSelectionnes = [
+      "Lundi",
+      "Mardi",
+      "Mercredi",
+      "Jeudi",
+      "Vendredi",
+    ].filter((day) => !daysOfWeek.includes(day));
+
+    // Liste des jours de la semaine sélectionnés
     const joursSelectionnes =
       daysOfWeek.length > 0
         ? daysOfWeek
         : ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
-    const periodeSelectionnee = [];
 
-    // Convertit la date de début et de fin en objets de date
+    // Convertir la date de début et de fin en objets de date
     const dateStart = new Date(start);
     const dateEnd = new Date(end);
 
@@ -34,10 +47,13 @@ router.post("/create-event", async (req, res) => {
       dateEnd.setDate(dateEnd.getDate() - 1);
     }
 
-    // Initialise la date courante à la date de début
+    // Initialise la date du jour à la date de début
     let currentDate = new Date(dateStart);
 
     // Liste des dates pour la période sélectionnée
+    const periodeSelectionnee = [];
+    const periodeNonSelectionnee = [];
+
     while (currentDate <= dateEnd) {
       if (joursSelectionnes.includes(getDayOfWeek(currentDate))) {
         periodeSelectionnee.push({
@@ -45,8 +61,32 @@ router.post("/create-event", async (req, res) => {
           dayOfWeek: getDayOfWeek(currentDate),
         });
       }
+
+      // Si le jour n'est pas sélectionné, on l'ajoute à la période non sélectionnée
+      if (joursNonSelectionnes.includes(getDayOfWeek(currentDate))) {
+        periodeNonSelectionnee.push({
+          date: new Date(currentDate.getTime()),
+          dayOfWeek: getDayOfWeek(currentDate),
+        });
+      }
+
       currentDate.setDate(currentDate.getDate() + 1);
     }
+
+    // Créer un Event pour les jours non sélectionnés
+    const invertedStatus = userStatus === "Cours" ? "Entreprise" : "Cours";
+
+    const invertedEvent = new Event({
+      title: invertedStatus,
+      start: new Date(start),
+      end: new Date(end),
+      user: userId,
+      daysOfWeek: joursNonSelectionnes,
+      periode: periodeNonSelectionnee,
+      status: invertedStatus,
+    });
+
+    invertedEvent.save();
 
     const periodeData = periodeSelectionnee.map((p) => ({
       date: p.date,
@@ -54,12 +94,13 @@ router.post("/create-event", async (req, res) => {
     }));
 
     const event = new Event({
-      title,
+      title: userStatus,
       start: new Date(start),
       end: new Date(end),
       user: userId,
       daysOfWeek: joursSelectionnes,
       periode: periodeData,
+      status: userStatus,
     });
 
     const savedEvent = await event.save();
@@ -67,11 +108,12 @@ router.post("/create-event", async (req, res) => {
     res.status(201).json({
       user: userId,
       eventId: savedEvent._id,
-      title,
+      title: userStatus,
       start: new Date(start),
       end: new Date(end),
       daysOfWeek: joursSelectionnes,
       periode: periodeData,
+      status: userStatus,
     });
   } catch (error) {
     console.log(error.message);
@@ -200,40 +242,6 @@ router.get("/presentUsers/:date", async (req, res) => {
   }
 });
 
-// router.get("/presentUsers/:date", async (req, res) => {
-//   try {
-//     const { date } = req.params;
-
-//     // Vérifier si la date est valide
-//     const selectedDate = new Date(date);
-//     if (isNaN(selectedDate.getTime())) {
-//       return res.status(400).json({ message: "Date invalide." });
-//     }
-
-//     // Récupérer les événements pour le jour spécifique
-//     const events = await Event.find({
-//       "periode.date": selectedDate,
-//     });
-
-//     if (events.length === 0) {
-//       return res.json({
-//         message: "Aucun événement trouvé pour cette date.",
-//       });
-//     }
-
-//     // Récupérer les utilisateurs associés aux événements
-//     const userIds = events.map((event) => event.user);
-//     const presentUsers = await User.find({ _id: { $in: userIds } });
-
-//     res.json({
-//       presentUsers: presentUsers,
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Erreur du serveur" });
-//   }
-// });
-
 // Récupérer tous les évènements
 router.get("/allEvents", async (req, res) => {
   try {
@@ -273,6 +281,28 @@ router.delete("/deleteEvent/:eventId", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Supprimer tous les Events de l'utilisateur
+router.delete("/users/:userId", async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const user = await User.findOne({ _id: userId });
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé." });
+    }
+
+    // Supprimer tous les événements associés à l'utilisateur
+    await Event.deleteOne({ _id: userId });
+
+    // Supprimer l'utilisateur
+    await user.deleteOne();
+
+    res.json("Utilisateur et ses événements supprimés avec succès.");
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur du serveur." });
   }
 });
 

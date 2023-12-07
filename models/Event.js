@@ -12,6 +12,7 @@ const EventSchema = new mongoose.Schema({
       dayOfWeek: String,
     },
   ],
+  status: String,
 });
 
 const Event = mongoose.model("Event", EventSchema);

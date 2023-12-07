@@ -22,6 +22,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: () => new Date(),
   },
+  status: {
+    type: String,
+    enum: ["Cours", "Entreprise"],
+    default: "Entreprise",
+  },
 });
 
 const User = mongoose.model("User", userSchema);
