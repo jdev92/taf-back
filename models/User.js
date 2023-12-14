@@ -24,8 +24,6 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Cours", "Entreprise"],
-    default: "Entreprise",
   },
 });
 
