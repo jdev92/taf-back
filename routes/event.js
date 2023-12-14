@@ -7,12 +7,9 @@ const moment = require("moment");
 // Créer un Event
 router.post("/create-event", async (req, res) => {
   try {
-    const { title, start, end, userId, daysOfWeek } = req.body;
-    // Récupérer le statut de l'utilisateur
-    const user = await User.findById(userId);
-    const userStatus = user.status || "Cours";
+    const { start, end, userId, daysOfWeek, title } = req.body;
 
-    // Liste des jours de la semaine non sélectionnés
+    const user = await User.findById(userId);
     const joursNonSelectionnes = [
       "Lundi",
       "Mardi",
@@ -21,17 +18,14 @@ router.post("/create-event", async (req, res) => {
       "Vendredi",
     ].filter((day) => !daysOfWeek.includes(day));
 
-    // Liste des jours de la semaine sélectionnés
     const joursSelectionnes =
       daysOfWeek.length > 0
         ? daysOfWeek
         : ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
 
-    // Convertir la date de début et de fin en objets de date
     const dateStart = new Date(start);
     const dateEnd = new Date(end);
 
-    // Trouve le premier jour sélectionné
     while (
       !joursSelectionnes.includes(getDayOfWeek(dateStart)) &&
       dateStart <= dateEnd
@@ -39,7 +33,6 @@ router.post("/create-event", async (req, res) => {
       dateStart.setDate(dateStart.getDate() + 1);
     }
 
-    // Trouve le dernier jour sélectionné
     while (
       !joursSelectionnes.includes(getDayOfWeek(dateEnd)) &&
       dateEnd >= dateStart
@@ -47,10 +40,7 @@ router.post("/create-event", async (req, res) => {
       dateEnd.setDate(dateEnd.getDate() - 1);
     }
 
-    // Initialise la date du jour à la date de début
     let currentDate = new Date(dateStart);
-
-    // Liste des dates pour la période sélectionnée
     const periodeSelectionnee = [];
     const periodeNonSelectionnee = [];
 
@@ -62,7 +52,6 @@ router.post("/create-event", async (req, res) => {
         });
       }
 
-      // Si le jour n'est pas sélectionné, on l'ajoute à la période non sélectionnée
       if (joursNonSelectionnes.includes(getDayOfWeek(currentDate))) {
         periodeNonSelectionnee.push({
           date: new Date(currentDate.getTime()),
@@ -73,8 +62,7 @@ router.post("/create-event", async (req, res) => {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    // Créer un Event pour les jours non sélectionnés
-    const invertedStatus = userStatus === "Cours" ? "Entreprise" : "Cours";
+    const invertedStatus = title === "Cours" ? "Entreprise" : "Cours";
 
     const invertedEvent = new Event({
       title: invertedStatus,
@@ -86,7 +74,7 @@ router.post("/create-event", async (req, res) => {
       status: invertedStatus,
     });
 
-    invertedEvent.save();
+    await invertedEvent.save();
 
     const periodeData = periodeSelectionnee.map((p) => ({
       date: p.date,
@@ -94,13 +82,13 @@ router.post("/create-event", async (req, res) => {
     }));
 
     const event = new Event({
-      title: userStatus,
+      title: title,
       start: new Date(start),
       end: new Date(end),
       user: userId,
       daysOfWeek: joursSelectionnes,
       periode: periodeData,
-      status: userStatus,
+      status: title,
     });
 
     const savedEvent = await event.save();
@@ -108,12 +96,12 @@ router.post("/create-event", async (req, res) => {
     res.status(201).json({
       user: userId,
       eventId: savedEvent._id,
-      title: userStatus,
+      title: title,
       start: new Date(start),
       end: new Date(end),
       daysOfWeek: joursSelectionnes,
       periode: periodeData,
-      status: userStatus,
+      status: title,
     });
   } catch (error) {
     console.log(error.message);
@@ -150,8 +138,8 @@ router.get("/userEvents/:id", async (req, res) => {
   }
 });
 
-// Récupérer les utilisateurs présents (home page)
-router.get("/presentUsers", async (req, res) => {
+// Récupérer les utilisateurs présents pour un jour spécifique
+router.get("/presentUsers/:date", async (req, res) => {
   try {
     const currentDate = new Date();
     const selectedDate = new Date(
@@ -168,7 +156,7 @@ router.get("/presentUsers", async (req, res) => {
     // Récupérer les événements pour le jour spécifique
     const events = await Event.find({
       "periode.date": { $gte: selectedDate, $lt: selectedEndDate },
-    });
+    }).populate("user");
 
     if (events.length === 0) {
       return res.json({
@@ -185,8 +173,13 @@ router.get("/presentUsers", async (req, res) => {
     }));
 
     // Récupérer les utilisateurs associés aux événements
-    const userIds = formattedEvents.map((event) => event.user);
-    const presentUsers = await User.find({ _id: { $in: userIds } });
+    const presentUsers = formattedEvents.map((event) => ({
+      _id: event.user._id,
+      firstName: event.user.firstName,
+      lastName: event.user.lastName,
+      email: event.user.email,
+      // Ajoutez d'autres propriétés d'utilisateur si nécessaire
+    }));
 
     res.json({
       presentUsers: presentUsers,
@@ -197,31 +190,34 @@ router.get("/presentUsers", async (req, res) => {
   }
 });
 
-// Récupérer les utilisateurs présents pour un jour spécifique
-router.get("/presentUsers/:date", async (req, res) => {
+// Récupérer les utilisateurs en entreprise pour un jour spécifique
+router.get("/presentEnterpriseUsers", async (req, res) => {
   try {
-    const { date } = req.params;
-    // const selectedDate = moment(date, "DD/MM/YYYY").toDate();
-    const selectedDate = moment.utc(date, "D/M/YYYY").toDate();
+    const currentDate = new Date();
+    const selectedDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate()
+    );
 
     // Calculer la date de fin en ajoutant 24 heures à la date de début
     const selectedEndDate = new Date(
       selectedDate.getTime() + 24 * 60 * 60 * 1000
     );
 
-    // Récupérer les événements pour le jour spécifique
-    const events = await Event.find({
-      "periode.date": selectedDate,
-    });
-    console.log(selectedDate);
+    // Récupérer les événements en entreprise pour le jour spécifique
+    const enterpriseEvents = await Event.find({
+      "periode.date": { $gte: selectedDate, $lt: selectedEndDate },
+      status: "Entreprise",
+    }).populate("user");
 
-    if (events.length === 0) {
+    if (enterpriseEvents.length === 0) {
       return res.json({
-        message: "Aucun utilisateur trouvé pour cette date.",
+        message: "Aucun utilisateur en entreprise trouvé pour cette date.",
       });
     }
 
-    const formattedEvents = events.map((event) => ({
+    const formattedEvents = enterpriseEvents.map((event) => ({
       ...event.toObject(),
       periode: event.periode.map((day) => ({
         date: moment(day.date).format("DD/MM/YYYY"),
@@ -229,12 +225,62 @@ router.get("/presentUsers/:date", async (req, res) => {
       })),
     }));
 
-    // Récupérer les utilisateurs associés aux événements
-    const userIds = formattedEvents.map((event) => event.user);
-    const presentUsers = await User.find({ _id: { $in: userIds } });
+    // Récupérer les utilisateurs associés aux événements en entreprise
+    const enterpriseUsers = formattedEvents.map((event) => ({
+      _id: event.user._id,
+      firstName: event.user.firstName,
+      lastName: event.user.lastName,
+      email: event.user.email,
+    }));
 
     res.json({
-      presentUsers: presentUsers,
+      enterpriseUsers: enterpriseUsers,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
+// Récupérer les utilisateurs présent pour le mois
+router.get("/presentEnterpriseUsers/:month", async (req, res) => {
+  try {
+    const { month } = req.params;
+    const firstDayOfMonth = moment(month, "YYYY-MM").startOf("month").toDate();
+    const lastDayOfMonth = moment(month, "YYYY-MM").endOf("month").toDate();
+
+    // Récupérer les événements en entreprise pour le mois spécifié
+    const enterpriseEvents = await Event.find({
+      "periode.date": { $gte: firstDayOfMonth, $lt: lastDayOfMonth },
+      status: "Entreprise",
+    }).populate("user");
+
+    if (enterpriseEvents.length === 0) {
+      return res.json({
+        message: "Aucun utilisateur en entreprise trouvé pour ce mois.",
+      });
+    }
+
+    const formattedEvents = enterpriseEvents.map((event) => ({
+      ...event.toObject(),
+      periode: event.periode.map((day) => ({
+        date: moment(day.date).format("DD/MM/YYYY"),
+        dayOfWeek: day.dayOfWeek,
+      })),
+    }));
+
+    // Récupérer les utilisateurs associés aux événements en entreprise
+    const enterpriseUsers = formattedEvents.map((event) => ({
+      _id: event.user._id,
+      firstName: event.user.firstName,
+      lastName: event.user.lastName,
+      daysOfWeek: event.daysOfWeek,
+      start: event.start,
+      end: event.end,
+    }));
+
+    res.json({
+      enterpriseUsers: enterpriseUsers,
     });
   } catch (error) {
     console.error(error);
