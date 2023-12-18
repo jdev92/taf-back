@@ -10,6 +10,8 @@ router.post("/create-event", async (req, res) => {
     const { start, end, userId, daysOfWeek, title } = req.body;
 
     const user = await User.findById(userId);
+    const userStatus = user.status;
+
     const joursNonSelectionnes = [
       "Lundi",
       "Mardi",
@@ -190,24 +192,15 @@ router.get("/presentUsers/:date", async (req, res) => {
   }
 });
 
-// Récupérer les utilisateurs en entreprise pour un jour spécifique
+// Récupérer les utilisateurs en entreprise à la date du jour (home)
 router.get("/presentEnterpriseUsers", async (req, res) => {
   try {
     const currentDate = new Date();
-    const selectedDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      currentDate.getDate()
-    );
-
-    // Calculer la date de fin en ajoutant 24 heures à la date de début
-    const selectedEndDate = new Date(
-      selectedDate.getTime() + 24 * 60 * 60 * 1000
-    );
-
+    currentDate.setHours(1, 0, 0, 0);
+    // console.log("currentDate =>", currentDate);
     // Récupérer les événements en entreprise pour le jour spécifique
     const enterpriseEvents = await Event.find({
-      "periode.date": { $gte: selectedDate, $lt: selectedEndDate },
+      "periode.date": currentDate,
       status: "Entreprise",
     }).populate("user");
 
@@ -232,7 +225,7 @@ router.get("/presentEnterpriseUsers", async (req, res) => {
       lastName: event.user.lastName,
       email: event.user.email,
     }));
-
+    console.log("enterpriseUsers =>", enterpriseUsers);
     res.json({
       enterpriseUsers: enterpriseUsers,
     });
@@ -242,26 +235,23 @@ router.get("/presentEnterpriseUsers", async (req, res) => {
   }
 });
 
-// Récupérer les utilisateurs présent pour le mois
-router.get("/presentEnterpriseUsers/:month", async (req, res) => {
+// Récupérer les utilisateurs présent à la date du jour (home)
+router.get("/presentCoursUsers", async (req, res) => {
   try {
-    const { month } = req.params;
-    const firstDayOfMonth = moment(month, "YYYY-MM").startOf("month").toDate();
-    const lastDayOfMonth = moment(month, "YYYY-MM").endOf("month").toDate();
-
-    // Récupérer les événements en entreprise pour le mois spécifié
-    const enterpriseEvents = await Event.find({
-      "periode.date": { $gte: firstDayOfMonth, $lt: lastDayOfMonth },
-      status: "Entreprise",
+    const currentDate = new Date();
+    currentDate.setHours(1, 0, 0, 0);
+    const coursEvents = await Event.find({
+      "periode.date": currentDate,
+      status: "Cours",
     }).populate("user");
 
-    if (enterpriseEvents.length === 0) {
+    if (coursEvents.length === 0) {
       return res.json({
-        message: "Aucun utilisateur en entreprise trouvé pour ce mois.",
+        message: "Aucun utilisateur en cours trouvé pour cette date.",
       });
     }
 
-    const formattedEvents = enterpriseEvents.map((event) => ({
+    const formattedEvents = coursEvents.map((event) => ({
       ...event.toObject(),
       periode: event.periode.map((day) => ({
         date: moment(day.date).format("DD/MM/YYYY"),
@@ -270,20 +260,59 @@ router.get("/presentEnterpriseUsers/:month", async (req, res) => {
     }));
 
     // Récupérer les utilisateurs associés aux événements en entreprise
-    const enterpriseUsers = formattedEvents.map((event) => ({
+    const coursUsers = formattedEvents.map((event) => ({
       _id: event.user._id,
       firstName: event.user.firstName,
       lastName: event.user.lastName,
-      daysOfWeek: event.daysOfWeek,
-      start: event.start,
-      end: event.end,
+      email: event.user.email,
     }));
-
+    console.log("coursUsers =>", coursUsers);
     res.json({
-      enterpriseUsers: enterpriseUsers,
+      coursUsers: coursUsers,
     });
   } catch (error) {
-    console.error(error);
+    console.log(error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
+// Récupérer les Events pour fullCalendar
+router.get("/calendarEvents", async (req, res) => {
+  try {
+    const events = await Event.find({}).populate("user");
+    // Formater les données pour fullCalendar
+    const userEvents = events.reduce((userEventMap, event) => {
+      const { user, periode } = event;
+      const userName = user.lastName;
+
+      if (!userEventMap.has(userName)) {
+        userEventMap.set(userName, []);
+      }
+
+      // Ajouter les dates spécifiques de la période pour cet événement
+      const userDates = userEventMap.get(userName);
+      periode.forEach((eventDate) => {
+        userDates.push({
+          title: event.title,
+          date: eventDate.date,
+        });
+      });
+
+      return userEventMap;
+    }, new Map());
+
+    // Convertir la carte en tableau
+    const formattedUserEvents = Array.from(
+      userEvents,
+      ([userName, userDates]) => ({
+        name: userName,
+        dates: userDates,
+      })
+    );
+
+    res.json(formattedUserEvents);
+  } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Erreur du serveur" });
   }
 });
@@ -349,6 +378,45 @@ router.delete("/users/:userId", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur du serveur." });
+  }
+});
+
+router.get("/presentUsers", async (req, res) => {
+  try {
+    const currentDate = new Date();
+    const selectedDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      currentDate.getDate()
+    );
+
+    // Calculer la date de fin en ajoutant 24 heures à la date de début
+    const selectedEndDate = new Date(
+      selectedDate.getTime() + 24 * 60 * 60 * 1000
+    );
+
+    // Récupérer les événements pour le jour spécifique
+    const events = await Event.find({
+      date: { $gte: selectedDate, $lt: selectedEndDate },
+    }).populate("User");
+    console.log(events);
+    if (events.length === 0) {
+      return res.json({
+        message: "Aucun utilisateur trouvé pour cette date.",
+      });
+    }
+
+    // Récupérer les utilisateurs associés aux événements
+    const userIds = events.map((event) => event.user);
+    const presentUsers = await User.find({ _id: { $in: userIds } });
+
+    res.json({
+      // presentUsers: presentUsers,
+      events: events,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur du serveur" });
   }
 });
 
