@@ -10,7 +10,6 @@ router.post("/create-event", async (req, res) => {
     const { start, end, userId, daysOfWeek, title } = req.body;
 
     const user = await User.findById(userId);
-    const userStatus = user.status;
 
     const joursNonSelectionnes = [
       "Lundi",
@@ -28,18 +27,16 @@ router.post("/create-event", async (req, res) => {
     const dateStart = new Date(start);
     const dateEnd = new Date(end);
 
-    while (
-      !joursSelectionnes.includes(getDayOfWeek(dateStart)) &&
-      dateStart <= dateEnd
-    ) {
-      dateStart.setDate(dateStart.getDate() + 1);
+    // Trouver le dernier jour
+    while (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
+      dateEnd.setDate(dateEnd.getDate() + 1);
     }
 
-    while (
-      !joursSelectionnes.includes(getDayOfWeek(dateEnd)) &&
-      dateEnd >= dateStart
-    ) {
-      dateEnd.setDate(dateEnd.getDate() - 1);
+    dateEnd.setDate(dateEnd.getDate() - 1);
+
+    // S'assurer que le dernier jour est inclus
+    if (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
+      dateEnd.setDate(dateEnd.getDate() + 1);
     }
 
     let currentDate = new Date(dateStart);
@@ -225,7 +222,7 @@ router.get("/presentEnterpriseUsers", async (req, res) => {
       lastName: event.user.lastName,
       email: event.user.email,
     }));
-    console.log("enterpriseUsers =>", enterpriseUsers);
+    // console.log("enterpriseUsers =>", enterpriseUsers);
     res.json({
       enterpriseUsers: enterpriseUsers,
     });
@@ -266,7 +263,7 @@ router.get("/presentCoursUsers", async (req, res) => {
       lastName: event.user.lastName,
       email: event.user.email,
     }));
-    console.log("coursUsers =>", coursUsers);
+    // console.log("coursUsers =>", coursUsers);
     res.json({
       coursUsers: coursUsers,
     });
@@ -378,45 +375,6 @@ router.delete("/users/:userId", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur du serveur." });
-  }
-});
-
-router.get("/presentUsers", async (req, res) => {
-  try {
-    const currentDate = new Date();
-    const selectedDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      currentDate.getDate()
-    );
-
-    // Calculer la date de fin en ajoutant 24 heures à la date de début
-    const selectedEndDate = new Date(
-      selectedDate.getTime() + 24 * 60 * 60 * 1000
-    );
-
-    // Récupérer les événements pour le jour spécifique
-    const events = await Event.find({
-      date: { $gte: selectedDate, $lt: selectedEndDate },
-    }).populate("User");
-    console.log(events);
-    if (events.length === 0) {
-      return res.json({
-        message: "Aucun utilisateur trouvé pour cette date.",
-      });
-    }
-
-    // Récupérer les utilisateurs associés aux événements
-    const userIds = events.map((event) => event.user);
-    const presentUsers = await User.find({ _id: { $in: userIds } });
-
-    res.json({
-      // presentUsers: presentUsers,
-      events: events,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Erreur du serveur" });
   }
 });
 
