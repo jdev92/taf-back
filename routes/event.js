@@ -29,7 +29,7 @@ router.post("/create-event", async (req, res) => {
 
     // Trouver le dernier jour
     while (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
-      dateEnd.setDate(dateEnd.getDate() + 1);
+      dateEnd.setDate(dateEnd.getDate() - 1);
     }
 
     dateEnd.setDate(dateEnd.getDate() - 1);
@@ -102,6 +102,8 @@ router.post("/create-event", async (req, res) => {
       periode: periodeData,
       status: title,
     });
+    console.log(dateStart);
+    console.log(dateEnd);
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: error.message });
