@@ -28,33 +28,39 @@ router.post("/create-event", async (req, res) => {
     const dateEnd = new Date(end);
 
     // Trouver le dernier jour
-    while (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
+    let lastSelectedDay = getDayOfWeek(dateEnd);
+
+    while (!joursSelectionnes.includes(lastSelectedDay)) {
       dateEnd.setDate(dateEnd.getDate() + 1);
+      lastSelectedDay = getDayOfWeek(dateEnd);
     }
 
-    dateEnd.setDate(dateEnd.getDate() - 1);
+    dateEnd.setDate(dateEnd.getDate());
 
     // S'assurer que le dernier jour est inclus
     if (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
       dateEnd.setDate(dateEnd.getDate() + 1);
     }
 
-    let currentDate = new Date(dateStart);
     const periodeSelectionnee = [];
     const periodeNonSelectionnee = [];
 
+    let currentDate = new Date(dateStart);
+
     while (currentDate <= dateEnd) {
-      if (joursSelectionnes.includes(getDayOfWeek(currentDate))) {
+      const currentDayOfWeek = getDayOfWeek(currentDate);
+
+      if (joursSelectionnes.includes(currentDayOfWeek)) {
         periodeSelectionnee.push({
           date: new Date(currentDate.getTime()),
-          dayOfWeek: getDayOfWeek(currentDate),
+          dayOfWeek: currentDayOfWeek,
         });
       }
 
-      if (joursNonSelectionnes.includes(getDayOfWeek(currentDate))) {
+      if (joursNonSelectionnes.includes(currentDayOfWeek)) {
         periodeNonSelectionnee.push({
           date: new Date(currentDate.getTime()),
-          dayOfWeek: getDayOfWeek(currentDate),
+          dayOfWeek: currentDayOfWeek,
         });
       }
 
@@ -105,7 +111,7 @@ router.post("/create-event", async (req, res) => {
     console.log(dateStart);
     console.log(dateEnd);
   } catch (error) {
-    console.log(error.message);
+    console.error(error.message);
     res.status(500).json({ message: error.message });
   }
 });
