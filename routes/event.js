@@ -39,7 +39,7 @@ router.post("/create-event", async (req, res) => {
 
     // S'assurer que le dernier jour est inclus
     if (!joursSelectionnes.includes(getDayOfWeek(dateEnd))) {
-      dateEnd.setDate(dateEnd.getDate() + 1);
+      dateEnd.setDate(dateEnd.getDate() - 1);
     }
 
     const periodeSelectionnee = [];
